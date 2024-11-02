@@ -1,0 +1,9 @@
+<Window x:Class="TimerApp.Views.AllTimersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="All Timers" Height="600" Width="800"
+        Background="#FF1E1E1E">
+    <ScrollViewer>
+        <WrapPanel x:Name="AllTimersPanel" Margin="10"/>
+    </ScrollViewer>
+</Window>
