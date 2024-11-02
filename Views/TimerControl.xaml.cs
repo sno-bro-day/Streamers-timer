@@ -2,8 +2,9 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using TimerApp.Models;
 using System.Windows.Media;
+using System.Windows.Data;
+using TimerApp.Models;
 
 namespace TimerApp.Views
 {
@@ -11,7 +12,7 @@ namespace TimerApp.Views
     {
         private readonly CustomTimer timer;
         private readonly DispatcherTimer dispatcherTimer;
-        public event EventHandler<CustomTimer>? TimerDeleted;
+        private Window? popoutWindow;
 
         public TimerControl(CustomTimer timer)
         {
@@ -43,17 +44,13 @@ namespace TimerApp.Views
             {
                 timer.CurrentTime = timer.CurrentTime.Add(TimeSpan.FromSeconds(1));
             }
+            timer.UpdateFile();
             UpdateDisplay();
         }
 
         private void UpdateDisplay()
         {
             string timeString = $"{timer.CurrentTime.Days:00}:{timer.CurrentTime.Hours:00}:{timer.CurrentTime.Minutes:00}:{timer.CurrentTime.Seconds:00}";
-            string displayMessage = timer.IsCountdown ? 
-                timer.Message.Replace("{timer}", timeString) :
-                timer.Message.Replace("{countup}", timeString);
-            
-            MessageDisplay.Text = displayMessage;
             TimeDisplay.Text = timeString;
             StartButton.IsEnabled = !timer.IsRunning;
             StopButton.IsEnabled = timer.IsRunning;
@@ -83,13 +80,6 @@ namespace TimerApp.Views
             UpdateDisplay();
         }
 
-        private void ResetButton_Click(object sender, RoutedEventArgs e)
-        {
-            StopTimer();
-            timer.CurrentTime = timer.StartTime;
-            UpdateDisplay();
-        }
-
         private void EditButton_Click(object sender, RoutedEventArgs e)
         {
             var settingsWindow = new TimerSettingsWindow(timer);
@@ -99,82 +89,90 @@ namespace TimerApp.Views
             }
         }
 
-        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        private void PopoutButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("Are you sure you want to delete this timer?", 
-                "Delete Timer", 
-                MessageBoxButton.YesNo, 
-                MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            if (popoutWindow == null)
             {
-                TimerDeleted?.Invoke(this, timer);
+                var miniControl = new Grid
+                {
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF404040"))
+                };
+
+                var timeDisplay = new TextBlock
+                {
+                    Text = TimeDisplay.Text,
+                    Foreground = Brushes.White,
+                    FontSize = 24,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                var hideButton = new Button
+                {
+                    Content = "👁️",
+                    Width = 20,
+                    Height = 20,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 2, 2, 0),
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF607D8B")),
+                    Foreground = Brushes.White
+                };
+
+                miniControl.Children.Add(timeDisplay);
+                miniControl.Children.Add(hideButton);
+
+                popoutWindow = new Window
+                {
+                    Title = timer.Name,
+                    Content = miniControl,
+                    Width = 150,
+                    Height = 60,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    Topmost = true,
+                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF2D2D2D"))
+                };
+
+                var binding = new Binding("Text") { Source = TimeDisplay };
+                timeDisplay.SetBinding(TextBlock.TextProperty, binding);
+
+                hideButton.Click += (s, args) => 
+                {
+                    if (popoutWindow.WindowStyle == WindowStyle.ToolWindow)
+                    {
+                        popoutWindow.WindowStyle = WindowStyle.None;
+                        popoutWindow.ResizeMode = ResizeMode.NoResize;
+                        hideButton.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        popoutWindow.WindowStyle = WindowStyle.ToolWindow;
+                        popoutWindow.ResizeMode = ResizeMode.CanResize;
+                        hideButton.Visibility = Visibility.Visible;
+                    }
+                };
+
+                popoutWindow.Closed += (s, args) => popoutWindow = null;
+                popoutWindow.Show();
+            }
+            else
+            {
+                popoutWindow.Activate();
             }
         }
-private Window? popoutWindow;
-private bool isUIHidden = false;
+        public event EventHandler<CustomTimer>? TimerDeleted;
 
-private void PopoutButton_Click(object sender, RoutedEventArgs e)
+// Add this method to handle delete functionality
+private void DeleteButton_Click(object sender, RoutedEventArgs e)
 {
-    if (popoutWindow == null)
+    if (MessageBox.Show("Are you sure you want to delete this timer?", 
+        "Delete Timer", 
+        MessageBoxButton.YesNo, 
+        MessageBoxImage.Warning) == MessageBoxResult.Yes)
     {
-        var miniTimer = new TimerControl(timer) { Width = 150, Height = 100 };
-        miniTimer.HideUI();
-        
-        popoutWindow = new Window
-        {
-            Title = timer.Name,
-            Content = miniTimer,
-            Width = 150,
-            Height = 100,
-            WindowStyle = WindowStyle.ToolWindow,
-            Topmost = true
-        };
-        
-        popoutWindow.Closed += (s, args) => popoutWindow = null;
-        popoutWindow.Show();
-    }
-    else
-    {
-        popoutWindow.Activate();
+        TimerDeleted?.Invoke(this, timer);
     }
 }
 
-private void HideUIButton_Click(object sender, RoutedEventArgs e)
-{
-    if (isUIHidden)
-        ShowUI();
-    else
-        HideUI();
-}
-
-public void HideUI()
-{
-    isUIHidden = true;
-    foreach (var element in FindVisualChildren<FrameworkElement>(this))
-    {
-        if (element != MessageDisplay && element != TimeDisplay)
-            element.Visibility = Visibility.Collapsed;
-    }
-}
-
-public void ShowUI()
-{
-    isUIHidden = false;
-    foreach (var element in FindVisualChildren<FrameworkElement>(this))
-    {
-        element.Visibility = Visibility.Visible;
-    }
-}
-
-private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
-{
-    if (depObj == null) yield break;
-    for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
-    {
-        var child = VisualTreeHelper.GetChild(depObj, i);
-        if (child is T t) yield return t;
-        foreach (T childOfChild in FindVisualChildren<T>(child))
-            yield return childOfChild;
-    }
-}
     }
 }
