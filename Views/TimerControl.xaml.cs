@@ -108,5 +108,72 @@ namespace TimerApp.Views
                 TimerDeleted?.Invoke(this, timer);
             }
         }
+private Window? popoutWindow;
+private bool isUIHidden = false;
+
+private void PopoutButton_Click(object sender, RoutedEventArgs e)
+{
+    if (popoutWindow == null)
+    {
+        var miniTimer = new TimerControl(timer) { Width = 150, Height = 100 };
+        miniTimer.HideUI();
+        
+        popoutWindow = new Window
+        {
+            Title = timer.Name,
+            Content = miniTimer,
+            Width = 150,
+            Height = 100,
+            WindowStyle = WindowStyle.ToolWindow,
+            Topmost = true
+        };
+        
+        popoutWindow.Closed += (s, args) => popoutWindow = null;
+        popoutWindow.Show();
+    }
+    else
+    {
+        popoutWindow.Activate();
+    }
+}
+
+private void HideUIButton_Click(object sender, RoutedEventArgs e)
+{
+    if (isUIHidden)
+        ShowUI();
+    else
+        HideUI();
+}
+
+public void HideUI()
+{
+    isUIHidden = true;
+    foreach (var element in FindVisualChildren<FrameworkElement>(this))
+    {
+        if (element != MessageDisplay && element != TimeDisplay)
+            element.Visibility = Visibility.Collapsed;
+    }
+}
+
+public void ShowUI()
+{
+    isUIHidden = false;
+    foreach (var element in FindVisualChildren<FrameworkElement>(this))
+    {
+        element.Visibility = Visibility.Visible;
+    }
+}
+
+private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+{
+    if (depObj == null) yield break;
+    for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+    {
+        var child = VisualTreeHelper.GetChild(depObj, i);
+        if (child is T t) yield return t;
+        foreach (T childOfChild in FindVisualChildren<T>(child))
+            yield return childOfChild;
+    }
+}
     }
 }
