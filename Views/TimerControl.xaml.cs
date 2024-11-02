@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using TimerApp.Models;
+using System.Windows.Media;
 
 namespace TimerApp.Views
 {
